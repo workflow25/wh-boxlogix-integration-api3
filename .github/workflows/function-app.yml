@@ -1,0 +1,74 @@
+name: wh-boxlogix-integration-api3-workflow
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [closed]
+    branches: ['master']
+
+permissions:
+  pull-requests: write
+  packages: read
+  contents: write
+    
+jobs:
+  Build:
+    uses: DotFoods/actions/.github/workflows/functions-build.yml@main
+    with:
+      dotnet-version: '8.0.x'
+      project-path-and-name: 'Dot.Services.BoxLogixIntegration/Dot.Services.BoxLogixIntegration.csproj'
+    secrets: inherit
+
+  Veracode-Scan:
+    needs: [Build]
+    uses: DotFoods/actions/.github/workflows/veracode-upload-scan.yml@main
+    with:
+        dotnet-version: '8.0.x'
+        project-path: 'Dot.Services.BoxLogixIntegration/Dot.Services.BoxLogixIntegration.csproj'
+        appname: 'wh-boxlogix-integration-api3'
+        version: 'wh-boxlogix-integration-api3.v1.${{ github.run_number }}'
+    secrets: inherit
+    
+  Deploy-DEV:
+    needs: [Build]
+    uses: DotFoods/actions/.github/workflows/functions-deploy.yml@main
+    with:
+      environment: development
+      function-app-name: 'fapp-boxlogixintegration-dev'
+      slot-name: 'fapp-boxlogixintegration-dev'
+    secrets:
+      publishProfileSecret: ${{ secrets.FAPP_BOXLOGIX_INTEGRATION_DEV_PUBLISH_PROFILE }}
+
+  SwapSlots-DEV:
+    needs: [Deploy-PROD]
+    uses: DotFoods/actions/.github/workflows/functions-swap.yml@main
+    with:
+      environment: development
+      function-app-name: 'fapp-boxlogixintegration-dev'
+      resource-group: '<dev_resource_group_name>'
+      source-slot: 'staging'
+      target-slot: 'production'
+    secrets:
+      azureCredentials: ${{ secrets.AZURE_SP_CREDENTIALS }} 
+
+  Deploy-PROD:
+    needs: [Deploy-DEV]
+    uses: DotFoods/actions/.github/workflows/functions-deploy.yml@main
+    with:
+      environment: production
+      function-app-name: 'fapp-boxlogixintegration-prd'
+      slot-name: 'fapp-boxlogixintegration-prd-staging'
+    secrets:
+      publishProfileSecret: ${{ secrets.FAPP_BOXLOGIX_INTEGRATION_PROD_STG_PUBLISH_PROFILE }}
+
+  SwapSlots-PROD:
+    needs: [Deploy-PROD]
+    uses: DotFoods/actions/.github/workflows/functions-swap.yml@main
+    with:
+      environment: production
+      function-app-name: 'fapp-boxlogixintegration-prd'
+      resource-group: 'rg-frozenparcelautomation-prd'
+      source-slot: 'staging'
+      target-slot: 'production'
+    secrets:
+      azureCredentials: ${{ secrets.AZURE_SP_CREDENTIALS }} 
