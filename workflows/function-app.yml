@@ -1,0 +1,74 @@
+name: <workflow_tag_name>
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [closed]
+    branches: ['master'] 
+   
+permissions:
+  pull-requests: write
+  packages: read
+  contents: write
+    
+jobs:
+  Build:
+    uses: DotFoods/actions/.github/workflows/functions-build.yml@main
+    with:
+      dotnet-version: '8.0.x'
+      project-path-and-name: '<build_path>'
+    secrets: inherit
+
+  Veracode-Scan:
+    needs: [Build]
+    uses: DotFoods/actions/.github/workflows/veracode-upload-scan.yml@main
+    with:
+        dotnet-version: '8.0.x'
+        project-path: '<veracode_build_path>'
+        appname: '<github_repo>'
+        version: '<github_repo>.v1.${{ github.run_number }}'
+    secrets: inherit
+    
+  # Deploy-DEV:
+    # needs: [Build]
+    # uses: DotFoods/actions/.github/workflows/functions-deploy.yml@main
+    # with:
+      # environment: development
+      # function-app-name: '<dev_function_app_name>'
+      # slot-name: '<dev_slot_name>'
+    # secrets:
+      # publishProfileSecret: ${{ secrets.<dev_publishProfileSecret_name> }}
+
+  # SwapSlots-DEV:
+    # needs: [Deploy-DEV]
+    # uses: DotFoods/actions/.github/workflows/functions-swap.yml@main
+    # with:
+      # environment: development
+      # function-app-name: '<dev_function_app_name>'
+      # resource-group: '<dev_resource_group_name>'
+      # source-slot: 'staging'
+      # target-slot: 'production'
+    # secrets:
+      # azureCredentials: ${{ secrets.AZURE_SP_CREDENTIALS }} 
+
+  # Deploy-PROD:
+    # needs: [SwapSlots-DEV]
+    # uses: DotFoods/actions/.github/workflows/functions-deploy.yml@main
+    # with:
+      # environment: production
+      # function-app-name: '<prod_function_app_name>'
+      # slot-name: '<prod_slot_name>'
+    # secrets:
+      # publishProfileSecret: ${{ secrets.<prod_publishProfileSecret_name> }}
+
+  # SwapSlots-PROD:
+    # needs: [Deploy-PROD]
+    # uses: DotFoods/actions/.github/workflows/functions-swap.yml@main
+    # with:
+      # environment: production
+      # function-app-name: '<prod_function_app_name>'
+      # resource-group: '<prod_resource_group_name>'
+      # source-slot: 'staging'
+      # target-slot: 'production'
+    # secrets:
+      # azureCredentials: ${{ secrets.AZURE_SP_CREDENTIALS }} 
